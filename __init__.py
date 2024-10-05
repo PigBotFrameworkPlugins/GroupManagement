@@ -1,9 +1,9 @@
 from pbf.utils import MetaData
 from pbf.utils.Config import Config
-from pbf.utils.Register import Command, ownerPermission
+from pbf.utils.Register import Command
 from pbf.utils.CQCode import CQCode
 from pbf.setup import logger
-from pbf import config
+from pbf import config as defaultConfig
 from pbf.controller.Data import Event
 from pbf.controller.Client import Msg, Client
 from pbf.statement import Statement
@@ -16,13 +16,32 @@ class FaceStatement(Statement):
         self.id = str(id)
 
 
+class MyConfig(Config):
+    originData = {
+        "owner_id": 114514
+    }
+config = MyConfig(defaultConfig.plugins_config.get("GroupManagement", {}))
+
+
 def adminPermission(event):
-    role: str = event.sender.get("role", "member")
-    if role == "admin" or role == "owner":
+    if event.sender.get("role", "member") in ["admin", "owner"]:
         return True
     Msg([
-        FaceStatement(1), " 403 Permission Denied\n"
+        FaceStatement(1), " 403 Forbidden\n"
         "您需要的权限：管理员\n"
+    ], event=event).send()
+    return False
+
+# 特别坑的两点（在PigBotFramework<=5.0.10中）：
+# - 位于pbf.utils.Register包中的ownerPermission实际上指的是群主权限，而不是机器人主人权限
+# - pbf.config没有为机器人主人的设置预留位置
+# 综上所述，PBF作者就是个**（
+def ownerPermission(event):
+    if event.user_id == config.get("owner_id"):
+        return True
+    Msg([
+        FaceStatement(1), " 403 Forbidden\n"
+        "您需要的权限：机器人主人\n"
     ], event=event).send()
     return False
 
